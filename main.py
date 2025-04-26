@@ -25,11 +25,17 @@ async def on_ready():
 # ─── Commands ───────────────────────────────────────────────────
 @bot.tree.command(name="gen_webhooks", description="Regenerate server with channels and webhooks inside a red embed.")
 async def gen_webhooks(interaction: discord.Interaction):
-    await interaction.response.defer(thinking=True)
-    guild = interaction.guild
+    try:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+    except Exception as e:
+        print(f"⚠️ Couldn't defer interaction: {e}")
 
+    guild = interaction.guild
     if not guild:
-        await interaction.followup.send("❌ This command can only be used in a server.", ephemeral=True)
+        try:
+            await interaction.followup.send("❌ This command can only be used in a server.", ephemeral=True)
+        except:
+            pass
         return
 
     # ─ Delete all old channels ─
@@ -41,27 +47,11 @@ async def gen_webhooks(interaction: discord.Interaction):
 
     # ─ Create structure ─
     structure = {
-        ".": [
-            "〔🕸️〕saved webhook",
-            "〔🌐〕site"
-        ],
-        ".2": [
-            "〔🚪〕visit"
-        ],
-        ".3": [
-            "〔🔓〕nbc",
-            "〔🔓〕premium",
-            "〔🔐〕v-nbc",
-            "〔🔐〕v-premium"
-        ],
-        ".4": [
-            "〔📈〕success",
-            "〔📉〕failed"
-        ],
-        ".5": [
-            "〔📜〕acc-with-group",
-            "〔📜〕acc-for-spam"
-        ]
+        ".": ["〔🕸️〕saved webhook", "〔🌐〕site"],
+        ".2": ["〔🚪〕visit"],
+        ".3": ["〔🔓〕nbc", "〔🔓〕premium", "〔🔐〕v-nbc", "〔🔐〕v-premium"],
+        ".4": ["〔📈〕success", "〔📉〕failed"],
+        ".5": ["〔📜〕acc-with-group", "〔📜〕acc-for-spam"]
     }
 
     created_channels = {}
@@ -76,14 +66,17 @@ async def gen_webhooks(interaction: discord.Interaction):
                 saved_webhook_channel = channel
 
     if not saved_webhook_channel:
-        await interaction.followup.send("❌ Failed to create saved webhook channel.", ephemeral=True)
+        try:
+            await interaction.followup.send("❌ Failed to create saved webhook channel.", ephemeral=True)
+        except:
+            pass
         return
 
     # ─ Create webhooks and collect them into an embed ─
     webhook_embed = discord.Embed(
         title="🕸️ Saved Webhooks",
         description="Here are your generated webhooks.",
-        color=discord.Color.red()  # Red color
+        color=discord.Color.red()
     )
 
     for chan_name, channel in created_channels.items():
@@ -93,20 +86,28 @@ async def gen_webhooks(interaction: discord.Interaction):
             webhook = await channel.create_webhook(name=f"Webhook - {chan_name}")
             webhook_embed.add_field(
                 name=f"#{chan_name}",
-                value=f"{webhook.url}",
+                value=webhook.url,
                 inline=False
             )
         except Exception as e:
             print(f"❗ Failed to create webhook in {chan_name}: {e}")
 
-    # ─ Add GIF at bottom ─
     webhook_embed.set_image(
-        url="https://media1.giphy.com/media/TIj8cbzWYKnE9ul3ab/giphy.gif?cid=6c09b9523m9bfr9o5es92kw9oyygwxxvj2bberdf31fevlhb&ep=v1_internal_gif_by_id&rid=giphy.gif&ct=s"
+        url="https://fiverr-res.cloudinary.com/images/f_auto,q_auto,t_main1/v1/attachments/delivery/asset/aa0d9d6c8813f5f65a00b2968ce75272-1668785195/Comp_1/do-a-cool-custom-animated-discord-profile-picture-or-banner-50-clients.gif"
     )
 
-    await saved_webhook_channel.send(embed=webhook_embed)
-    await interaction.followup.send("✅ Server reset and webhooks generated successfully!", ephemeral=True)
-    print(f"✅ All webhooks sent inside embed to {saved_webhook_channel.name}.")
+    # ─ Send the embed and finalize ─
+    try:
+        await saved_webhook_channel.send(embed=webhook_embed)
+        print(f"✅ All webhooks sent inside embed to {saved_webhook_channel.name}.")
+    except Exception as e:
+        print(f"❌ Failed to send embed: {e}")
+
+    # ─ Try to send success message ─
+    try:
+        await interaction.followup.send("✅ Server reset and webhooks generated successfully!", ephemeral=True)
+    except Exception as e:
+        print(f"⚠️ Couldn't send followup success message: {e}")
 
 # ─── Run Bot ────────────────────────────────────────────────────
 bot.run(os.getenv("TOKEN"))
