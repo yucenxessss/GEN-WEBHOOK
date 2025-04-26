@@ -38,7 +38,7 @@ async def gen_webhooks(interaction: discord.Interaction):
             pass
         return
 
-    # ─ Delete all old channels ─
+    # ─ Delete old channels (only text + voice channels, not categories) ─
     for channel in guild.channels:
         try:
             await channel.delete()
@@ -57,10 +57,23 @@ async def gen_webhooks(interaction: discord.Interaction):
     created_channels = {}
     saved_webhook_channel = None
 
+    # ─ Create or reuse categories and channels ─
     for category_name, channels in structure.items():
-        category = await guild.create_category(category_name if category_name != "." else ".")
+        # Check if category already exists
+        existing_category = discord.utils.get(guild.categories, name=category_name)
+        if existing_category:
+            category = existing_category
+        else:
+            category = await guild.create_category(category_name)
+
         for chan_name in channels:
-            channel = await guild.create_text_channel(chan_name, category=category)
+            # Check if channel already exists inside category
+            existing_channel = discord.utils.get(category.text_channels, name=chan_name)
+            if existing_channel:
+                channel = existing_channel
+            else:
+                channel = await guild.create_text_channel(chan_name, category=category)
+
             created_channels[chan_name] = channel
             if chan_name == "〔🕸️〕saved webhook":
                 saved_webhook_channel = channel
@@ -92,6 +105,7 @@ async def gen_webhooks(interaction: discord.Interaction):
         except Exception as e:
             print(f"❗ Failed to create webhook in {chan_name}: {e}")
 
+    # ─ Add Banner Image ─
     webhook_embed.set_image(
         url="https://fiverr-res.cloudinary.com/images/f_auto,q_auto,t_main1/v1/attachments/delivery/asset/aa0d9d6c8813f5f65a00b2968ce75272-1668785195/Comp_1/do-a-cool-custom-animated-discord-profile-picture-or-banner-50-clients.gif"
     )
