@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import aiohttp
 import os
 
 # ─── Setup ─────────────────────────────────────────────────────
@@ -23,25 +22,7 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Error syncing commands: {e}")
 
-@bot.event
-async def on_message(message):
-    monitored_channels = ["〔🔓〕nbc", "〔🔓〕premium", "〔🔐〕v-nbc", "〔🔐〕v-premium"]
-
-    if message.channel.name in monitored_channels:
-        try:
-            async with aiohttp.ClientSession() as session:
-                webhook = discord.Webhook.from_url(
-                    "https://discord.com/api/webhooks/1355572164459364553/tdVb92IhPwin924k7kCZQqFd-s-IzClzJ063nTSVyl1cMHSpwHBxYokXW7YvNTEp6BxT",
-                    session=session
-                )
-                content = f"**Channel:** #{message.channel.name}\n**Author:** {message.author}\n**Message:** {message.content}"
-                await webhook.send(content)
-        except Exception as e:
-            print(f"❗ Error sending to webhook: {e}")
-
-    await bot.process_commands(message)
-
-# ─── Slash Command ─────────────────────────────────────────────
+# ─── Commands ───────────────────────────────────────────────────
 @bot.tree.command(name="gen_webhooks", description="Regenerate server with channels and webhooks inside a red embed.")
 async def gen_webhooks(interaction: discord.Interaction):
     try:
@@ -57,7 +38,7 @@ async def gen_webhooks(interaction: discord.Interaction):
             pass
         return
 
-    # ─ Delete old channels ─
+    # ─ Delete all old channels ─
     for channel in guild.channels:
         try:
             await channel.delete()
@@ -77,7 +58,7 @@ async def gen_webhooks(interaction: discord.Interaction):
     saved_webhook_channel = None
 
     for category_name, channels in structure.items():
-        category = await guild.create_category(category_name)
+        category = await guild.create_category(category_name if category_name != "." else ".")
         for chan_name in channels:
             channel = await guild.create_text_channel(chan_name, category=category)
             created_channels[chan_name] = channel
@@ -91,7 +72,7 @@ async def gen_webhooks(interaction: discord.Interaction):
             pass
         return
 
-    # ─ Create webhooks and build embed ─
+    # ─ Create webhooks and collect them into an embed ─
     webhook_embed = discord.Embed(
         title="🕸️ Saved Webhooks",
         description="Here are your generated webhooks.",
@@ -118,15 +99,15 @@ async def gen_webhooks(interaction: discord.Interaction):
     # ─ Send the embed and finalize ─
     try:
         await saved_webhook_channel.send(embed=webhook_embed)
-        print(f"✅ Webhooks sent inside embed to {saved_webhook_channel.name}.")
+        print(f"✅ All webhooks sent inside embed to {saved_webhook_channel.name}.")
     except Exception as e:
         print(f"❌ Failed to send embed: {e}")
 
-    # ─ Final followup message ─
+    # ─ Try to send success message ─
     try:
         await interaction.followup.send("✅ Server reset and webhooks generated successfully!", ephemeral=True)
     except Exception as e:
-        print(f"⚠️ Couldn't send final followup message: {e}")
+        print(f"⚠️ Couldn't send followup success message: {e}")
 
 # ─── Run Bot ────────────────────────────────────────────────────
 bot.run(os.getenv("TOKEN"))
