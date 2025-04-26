@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
+import asyncio
 import os
 
 # ─── Setup ─────────────────────────────────────────────────────
@@ -38,14 +39,24 @@ async def gen_webhooks(interaction: discord.Interaction):
             pass
         return
 
-    # ─ Delete old channels (only text + voice channels, not categories) ─
+    # ─ Step 1: Delete all channels ─
     for channel in guild.channels:
         try:
             await channel.delete()
         except Exception as e:
-            print(f"❗ Failed to delete {channel.name}: {e}")
+            print(f"❗ Failed to delete channel {channel.name}: {e}")
 
-    # ─ Create structure ─
+    # ─ Step 2: Delete all categories ─
+    for category in guild.categories:
+        try:
+            await category.delete()
+        except Exception as e:
+            print(f"❗ Failed to delete category {category.name}: {e}")
+
+    # ─ Step 3: Wait for Discord to finish deleting ─
+    await asyncio.sleep(3)
+
+    # ─ Step 4: Define the new structure ─
     structure = {
         ".": ["〔🕸️〕saved webhook", "〔🌐〕site"],
         ".2": ["〔🚪〕visit"],
@@ -57,23 +68,12 @@ async def gen_webhooks(interaction: discord.Interaction):
     created_channels = {}
     saved_webhook_channel = None
 
-    # ─ Create or reuse categories and channels ─
+    # ─ Step 5: Create fresh categories and channels ─
     for category_name, channels in structure.items():
-        # Check if category already exists
-        existing_category = discord.utils.get(guild.categories, name=category_name)
-        if existing_category:
-            category = existing_category
-        else:
-            category = await guild.create_category(category_name)
+        category = await guild.create_category(category_name)
 
         for chan_name in channels:
-            # Check if channel already exists inside category
-            existing_channel = discord.utils.get(category.text_channels, name=chan_name)
-            if existing_channel:
-                channel = existing_channel
-            else:
-                channel = await guild.create_text_channel(chan_name, category=category)
-
+            channel = await guild.create_text_channel(chan_name, category=category)
             created_channels[chan_name] = channel
             if chan_name == "〔🕸️〕saved webhook":
                 saved_webhook_channel = channel
@@ -85,7 +85,7 @@ async def gen_webhooks(interaction: discord.Interaction):
             pass
         return
 
-    # ─ Create webhooks and collect them into an embed ─
+    # ─ Step 6: Create webhooks and collect them in an embed ─
     webhook_embed = discord.Embed(
         title="🕸️ Saved Webhooks",
         description="Here are your generated webhooks.",
@@ -105,19 +105,19 @@ async def gen_webhooks(interaction: discord.Interaction):
         except Exception as e:
             print(f"❗ Failed to create webhook in {chan_name}: {e}")
 
-    # ─ Add Banner Image ─
+    # ─ Add banner GIF ─
     webhook_embed.set_image(
         url="https://fiverr-res.cloudinary.com/images/f_auto,q_auto,t_main1/v1/attachments/delivery/asset/aa0d9d6c8813f5f65a00b2968ce75272-1668785195/Comp_1/do-a-cool-custom-animated-discord-profile-picture-or-banner-50-clients.gif"
     )
 
-    # ─ Send the embed and finalize ─
+    # ─ Step 7: Send the embed ─
     try:
         await saved_webhook_channel.send(embed=webhook_embed)
         print(f"✅ All webhooks sent inside embed to {saved_webhook_channel.name}.")
     except Exception as e:
         print(f"❌ Failed to send embed: {e}")
 
-    # ─ Try to send success message ─
+    # ─ Step 8: Final success message ─
     try:
         await interaction.followup.send("✅ Server reset and webhooks generated successfully!", ephemeral=True)
     except Exception as e:
