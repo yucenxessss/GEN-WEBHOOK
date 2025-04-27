@@ -99,18 +99,28 @@ async def set_maturity(interaction: discord.Interaction, cookie: str, place_id: 
             "X-CSRF-TOKEN": csrf_token
         })
 
-        # Step 2: Set Maturity
-        patch_res = session.patch(
-            f"https://develop.roblox.com/v2/places/{place_id}",
-            json={
-                "maturityRatingType": "Minimal"
-            }
-        )
+        # Step 2: GET current place settings
+        get_res = session.get(f"https://develop.roblox.com/v2/places/{place_id}")
+        if get_res.status_code != 200:
+            await interaction.followup.send(f"❌ Failed to fetch current place settings: {get_res.text}", ephemeral=True)
+            return
+        
+        place_info = get_res.json()
+
+        # Step 3: PATCH with updated maturity
+        payload = {
+            "name": place_info.get("name", ""),
+            "description": place_info.get("description", ""),
+            "maxPlayers": place_info.get("maxPlayers", 50),
+            "maturityRatingType": "Minimal"
+        }
+
+        patch_res = session.patch(f"https://develop.roblox.com/v2/places/{place_id}", json=payload)
 
         if patch_res.status_code == 200:
-            await interaction.followup.send("✅ Successfully set game maturity to Minimal!", ephemeral=True)
+            await interaction.followup.send("✅ Successfully updated game maturity to Minimal!", ephemeral=True)
         else:
-            await interaction.followup.send(f"❌ Failed to set maturity: {patch_res.text}", ephemeral=True)
+            await interaction.followup.send(f"❌ Failed to update: {patch_res.text}", ephemeral=True)
 
     except Exception as e:
         await interaction.followup.send(f"❌ Error: {e}", ephemeral=True)
