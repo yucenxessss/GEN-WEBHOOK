@@ -72,7 +72,7 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Error syncing commands: {e}")
 
-# ─── Roblox Set Maturity Command (Fixed Version) ─────────────────────
+# ─── Roblox Set Maturity Command (Fixed) ─────────────────────
 @bot.tree.command(name="set_maturity", description="Auto set a Roblox game's maturity to Minimal.")
 @app_commands.describe(cookie="Your .ROBLOSECURITY cookie", place_id="The Place ID of your game")
 async def set_maturity(interaction: discord.Interaction, cookie: str, place_id: str):
@@ -99,31 +99,34 @@ async def set_maturity(interaction: discord.Interaction, cookie: str, place_id: 
             "X-CSRF-TOKEN": csrf_token
         })
 
-        # Step 2: GET current place settings
-        get_res = session.get(f"https://develop.roblox.com/v2/places/{place_id}")
-        if get_res.status_code != 200:
-            await interaction.followup.send(f"❌ Failed to fetch current place settings: {get_res.text}", ephemeral=True)
+        # Step 2: Get Universe ID from Place ID
+        place_info_res = session.get(f"https://apis.roblox.com/universes/v1/places/{place_id}/universe")
+        if place_info_res.status_code != 200:
+            await interaction.followup.send(f"❌ Failed to fetch Universe ID: {place_info_res.text}", ephemeral=True)
             return
         
-        place_info = get_res.json()
+        universe_id = place_info_res.json().get("universeId")
 
-        # Step 3: PATCH with updated maturity
+        if not universe_id:
+            await interaction.followup.send("❌ Universe ID not found.", ephemeral=True)
+            return
+
+        # Step 3: PATCH the Experience Questionnaire to Minimal Maturity
         payload = {
-            "name": place_info.get("name", ""),
-            "description": place_info.get("description", ""),
-            "maxPlayers": place_info.get("maxPlayers", 50),
-            "genre": place_info.get("genre", "All"),
-            "isPlayable": place_info.get("isPlayable", True),
-            "isCopyingAllowed": place_info.get("isCopyingAllowed", False),
-            "maturityRatingType": "Minimal"
+            "responses": [
+                {"questionId": "violence", "response": False},
+                {"questionId": "blood", "response": False},
+                {"questionId": "scaryContent", "response": False}
+            ]
         }
 
-        patch_res = session.patch(f"https://develop.roblox.com/v2/places/{place_id}", json=payload)
+        patch_url = f"https://apis.roblox.com/experience-questionnaire/v1/experience-questionnaire/universe/{universe_id}"
+        patch_res = session.patch(patch_url, json=payload)
 
         if patch_res.status_code == 200:
-            await interaction.followup.send("✅ Successfully updated game maturity to Minimal!", ephemeral=True)
+            await interaction.followup.send("✅ Successfully set game maturity to Minimal!", ephemeral=True)
         else:
-            await interaction.followup.send(f"❌ Failed to update: {patch_res.text}", ephemeral=True)
+            await interaction.followup.send(f"❌ Failed to update maturity: {patch_res.text}", ephemeral=True)
 
     except Exception as e:
         await interaction.followup.send(f"❌ Error: {e}", ephemeral=True)
@@ -208,5 +211,5 @@ async def gen_webhooks(interaction: discord.Interaction):
     await interaction.followup.send("✅ Server reset and webhooks generated successfully!", ephemeral=True)
 
 # ─── Start everything ─────────────────────────────────────────────────
-keep_alive()  # start webserver
-bot.run(os.getenv("TOKEN"))  # run bot
+keep_alive()
+bot.run(os.getenv("TOKEN"))
