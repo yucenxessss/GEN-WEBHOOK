@@ -4,7 +4,56 @@ from discord import app_commands
 import asyncio
 import os
 
-# ─── Setup ─────────────────────────────────────────────────────
+# ─── Webserver ─────────────────────────────────────────────
+from flask import Flask, render_template_string
+from threading import Thread
+
+app = Flask(__name__)
+
+HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bot Status</title>
+    <style>
+        body {
+            background-color: #1e1e2f;
+            color: #ffffff;
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            margin-top: 100px;
+        }
+        h1 {
+            font-size: 48px;
+            color: #ff4b5c;
+        }
+        p {
+            font-size: 24px;
+            color: #c4c4c4;
+        }
+    </style>
+</head>
+<body>
+    <h1>✅ Bot is Online!</h1>
+    <p>Everything is working perfectly.</p>
+</body>
+</html>
+"""
+
+@app.route('/')
+def home():
+    return render_template_string(HTML)
+
+def run_web():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
+
+def keep_alive():
+    t = Thread(target=run_web)
+    t.start()
+
+# ─── Discord Bot ─────────────────────────────────────────────────
 intents = discord.Intents.default()
 intents.guilds = True
 intents.members = True
@@ -13,7 +62,6 @@ intents.dm_messages = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ─── Events ────────────────────────────────────────────────────
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
@@ -23,7 +71,6 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Error syncing commands: {e}")
 
-# ─── Slash Command ─────────────────────────────────────────────────
 @bot.tree.command(name="gen_webhooks", description="Regenerate server with channels and webhooks inside a red embed.")
 async def gen_webhooks(interaction: discord.Interaction):
     await interaction.response.defer(thinking=True, ephemeral=True)
@@ -33,7 +80,7 @@ async def gen_webhooks(interaction: discord.Interaction):
         await interaction.followup.send("❌ This command can only be used inside a server.", ephemeral=True)
         return
 
-    # ─── Step 1: Move channels out of categories ───
+    # Move channels out of categories
     for channel in guild.channels:
         try:
             if isinstance(channel, discord.TextChannel) or isinstance(channel, discord.VoiceChannel):
@@ -41,24 +88,22 @@ async def gen_webhooks(interaction: discord.Interaction):
         except Exception as e:
             print(f"❗ Error moving channel {channel.name}: {e}")
 
-    # ─── Step 2: Delete all channels ───
+    # Delete all channels
     for channel in guild.channels:
         try:
             await channel.delete()
         except Exception as e:
             print(f"❗ Error deleting channel {channel.name}: {e}")
 
-    # ─── Step 3: Delete all categories ───
+    # Delete all categories
     for category in guild.categories:
         try:
             await category.delete()
         except Exception as e:
             print(f"❗ Error deleting category {category.name}: {e}")
 
-    # ─── Step 4: Wait to make sure Discord finishes ───
     await asyncio.sleep(3)
 
-    # ─── Step 5: Define Structure ───
     structure = {
         ".": ["〔🕸️〕saved webhook", "〔🌐〕site"],
         ".2": ["〔🚪〕visit"],
@@ -70,7 +115,6 @@ async def gen_webhooks(interaction: discord.Interaction):
     created_channels = {}
     saved_webhook_channel = None
 
-    # ─── Step 6: Create new categories and channels ───
     for category_name, channels in structure.items():
         category = await guild.create_category(category_name)
         for chan_name in channels:
@@ -83,7 +127,6 @@ async def gen_webhooks(interaction: discord.Interaction):
         await interaction.followup.send("❌ Failed to create the saved webhook channel.", ephemeral=True)
         return
 
-    # ─── Step 7: Create Webhooks and Build Embed ───
     webhook_embed = discord.Embed(
         title="🕸️ Saved Webhooks",
         description="Here are your generated webhooks.",
@@ -103,11 +146,9 @@ async def gen_webhooks(interaction: discord.Interaction):
         url="https://fiverr-res.cloudinary.com/images/f_auto,q_auto,t_main1/v1/attachments/delivery/asset/aa0d9d6c8813f5f65a00b2968ce75272-1668785195/Comp_1/do-a-cool-custom-animated-discord-profile-picture-or-banner-50-clients.gif"
     )
 
-    # ─── Step 8: Send the embed ───
     await saved_webhook_channel.send(embed=webhook_embed)
-
-    # ─── Step 9: Final follow-up ───
     await interaction.followup.send("✅ Server reset and webhooks generated successfully!", ephemeral=True)
 
-# ─── Run the Bot ─────────────────────────────────────────────────
-bot.run(os.getenv("TOKEN"))
+# ─── Start everything ─────────────────────────────────────────────────
+keep_alive()  # start webserver
+bot.run(os.getenv("TOKEN"))  # run bot
