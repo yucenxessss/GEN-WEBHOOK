@@ -81,20 +81,38 @@ async def play(interaction: discord.Interaction, cookie: str, game_id: str):
 
     try:
         session = requests.Session()
-        session.cookies[".ROBLOSECURITY"] = cookie
-        session.headers.update({"User-Agent": "Roblox/WinInet"})
-
-        # Get CSRF Token
-        res = session.post("https://auth.roblox.com/v2/logout")
-        csrf_token = res.headers.get("x-csrf-token")
-        session.headers.update({"X-CSRF-TOKEN": csrf_token})
+        session.cookies.set(".ROBLOSECURITY", cookie, domain=".roblox.com")
+        session.headers.update({
+            "User-Agent": "Roblox/WinInet",
+            "Referer": "https://www.roblox.com/"
+        })
 
         # Get Auth Ticket
-        auth_res = session.post("https://auth.roblox.com/v1/authentication-ticket")
-        auth_ticket = auth_res.headers["rbx-authentication-ticket"]
+        auth_res = session.post(
+            "https://auth.roblox.com/v1/authentication-ticket",
+            headers={
+                "Accept": "application/json",
+                "RBX-Request-Identifier": "GetAuthenticationTicket"
+            }
+        )
+
+        if auth_res.status_code != 200:
+            await interaction.followup.send(f"❌ Failed to get authentication ticket: {auth_res.text}", ephemeral=True)
+            return
+
+        auth_ticket = auth_res.headers.get("rbx-authentication-ticket")
+        if not auth_ticket:
+            await interaction.followup.send("❌ Authentication ticket not found.", ephemeral=True)
+            return
 
         # Launch Roblox
-        url = f"roblox-player:1+launchmode:play+gameinfo:{auth_ticket}+placelauncherurl:https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGame&placeId={game_id}"
+        url = (
+            f"roblox-player:1+launchmode:play+gameinfo:{auth_ticket}"
+            f"+placelauncherurl:https://assetgame.roblox.com/game/PlaceLauncher.ashx"
+            f"?request=RequestGame&placeId={game_id}+browserTrackerId:0"
+            f"+robloxLocale:en_us+gameLocale:en_us"
+        )
+
         webbrowser.open(url)
 
         await interaction.followup.send("✅ Roblox game launching...", ephemeral=True)
