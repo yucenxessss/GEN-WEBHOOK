@@ -72,7 +72,7 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Error syncing commands: {e}")
 
-# ─── Roblox Set Maturity Command ─────────────────────────────────────
+# ─── Roblox Set Maturity Command (Fixed Version) ─────────────────────
 @bot.tree.command(name="set_maturity", description="Auto set a Roblox game's maturity to Minimal.")
 @app_commands.describe(cookie="Your .ROBLOSECURITY cookie", place_id="The Place ID of your game")
 async def set_maturity(interaction: discord.Interaction, cookie: str, place_id: str):
@@ -112,6 +112,9 @@ async def set_maturity(interaction: discord.Interaction, cookie: str, place_id: 
             "name": place_info.get("name", ""),
             "description": place_info.get("description", ""),
             "maxPlayers": place_info.get("maxPlayers", 50),
+            "genre": place_info.get("genre", "All"),
+            "isPlayable": place_info.get("isPlayable", True),
+            "isCopyingAllowed": place_info.get("isCopyingAllowed", False),
             "maturityRatingType": "Minimal"
         }
 
