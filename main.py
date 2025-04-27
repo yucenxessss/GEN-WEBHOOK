@@ -4,7 +4,6 @@ from discord import app_commands
 import asyncio
 import os
 import requests
-import webbrowser
 
 # ─── Webserver ─────────────────────────────────────────────
 from flask import Flask, render_template_string
@@ -73,10 +72,10 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Error syncing commands: {e}")
 
-# ─── Roblox Play Command ─────────────────────────────────────
-@bot.tree.command(name="play", description="Auto launch a Roblox game using cookie and game ID")
-@app_commands.describe(cookie="Your .ROBLOSECURITY cookie", game_id="The Roblox game ID to launch")
-async def play(interaction: discord.Interaction, cookie: str, game_id: str):
+# ─── Roblox Set Maturity Command ─────────────────────────────────────
+@bot.tree.command(name="set_maturity", description="Auto set a Roblox game's maturity to Minimal.")
+@app_commands.describe(cookie="Your .ROBLOSECURITY cookie", place_id="The Place ID of your game")
+async def set_maturity(interaction: discord.Interaction, cookie: str, place_id: str):
     await interaction.response.defer(thinking=True, ephemeral=True)
 
     try:
@@ -88,7 +87,7 @@ async def play(interaction: discord.Interaction, cookie: str, game_id: str):
             "Origin": "https://www.roblox.com"
         })
 
-        # Step 1: Trigger a CSRF Token by doing a fake POST
+        # Step 1: Get CSRF Token
         csrf_req = session.post("https://auth.roblox.com/v2/logout")
         csrf_token = csrf_req.headers.get("x-csrf-token")
 
@@ -96,46 +95,25 @@ async def play(interaction: discord.Interaction, cookie: str, game_id: str):
             await interaction.followup.send("❌ Could not get CSRF token.", ephemeral=True)
             return
 
-        # Update session headers with CSRF token
         session.headers.update({
             "X-CSRF-TOKEN": csrf_token
         })
 
-        # Step 2: Now get the authentication ticket
-        auth_res = session.post(
-            "https://auth.roblox.com/v1/authentication-ticket",
-            headers={
-                "Accept": "application/json",
-                "RBX-Request-Identifier": "GetAuthenticationTicket",
-                "X-CSRF-TOKEN": csrf_token,
-                "Origin": "https://www.roblox.com",
-                "Referer": "https://www.roblox.com/"
+        # Step 2: Set Maturity
+        patch_res = session.patch(
+            f"https://develop.roblox.com/v2/places/{place_id}",
+            json={
+                "maturityRatingType": "Minimal"
             }
         )
 
-        if auth_res.status_code != 200:
-            await interaction.followup.send(f"❌ Failed to get authentication ticket: {auth_res.text}", ephemeral=True)
-            return
-
-        auth_ticket = auth_res.headers.get("rbx-authentication-ticket")
-        if not auth_ticket:
-            await interaction.followup.send("❌ Authentication ticket not found.", ephemeral=True)
-            return
-
-        # Step 3: Launch Roblox
-        url = (
-            f"roblox-player:1+launchmode:play+gameinfo:{auth_ticket}"
-            f"+placelauncherurl:https://assetgame.roblox.com/game/PlaceLauncher.ashx"
-            f"?request=RequestGame&placeId={game_id}+browserTrackerId:0"
-            f"+robloxLocale:en_us+gameLocale:en_us"
-        )
-
-        webbrowser.open(url)
-
-        await interaction.followup.send("✅ Roblox game launching...", ephemeral=True)
+        if patch_res.status_code == 200:
+            await interaction.followup.send("✅ Successfully set game maturity to Minimal!", ephemeral=True)
+        else:
+            await interaction.followup.send(f"❌ Failed to set maturity: {patch_res.text}", ephemeral=True)
 
     except Exception as e:
-        await interaction.followup.send(f"❌ Failed to launch: {e}", ephemeral=True)
+        await interaction.followup.send(f"❌ Error: {e}", ephemeral=True)
 
 # ─── Webhook Gen Command ─────────────────────────────────────────
 @bot.tree.command(name="gen_webhooks", description="Regenerate server with channels and webhooks inside a red embed.")
