@@ -111,23 +111,22 @@ async def set_maturity(interaction: discord.Interaction, cookie: str, place_id: 
             await interaction.followup.send("❌ Universe ID not found.", ephemeral=True)
             return
 
-        # Step 3: POST the Experience Questionnaire to set Minimal Maturity
+        # Step 3: PATCH the Universe Configuration to Minimal Maturity
         payload = {
-            "responses": [
-                {"questionId": "violence", "response": False},
-                {"questionId": "blood", "response": False},
-                {"questionId": "scaryContent", "response": False}
-            ],
-            "version": 2
+            "universeConfiguration": {
+                "maturitySettings": {
+                    "isMature": False
+                }
+            }
         }
 
-        post_url = f"https://apis.roblox.com/experience-questionnaire/v1/experience-questionnaire/universe/{universe_id}"
-        post_res = session.post(post_url, json=payload)
+        patch_url = f"https://apis.roblox.com/universes/v1/{universe_id}/configuration"
+        patch_res = session.patch(patch_url, json=payload)
 
-        if post_res.status_code == 200:
+        if patch_res.status_code == 200:
             await interaction.followup.send("✅ Successfully set game maturity to Minimal!", ephemeral=True)
         else:
-            await interaction.followup.send(f"❌ Failed to update maturity: {post_res.text}", ephemeral=True)
+            await interaction.followup.send(f"❌ Failed to update maturity: {patch_res.text}", ephemeral=True)
 
     except Exception as e:
         await interaction.followup.send(f"❌ Error: {e}", ephemeral=True)
