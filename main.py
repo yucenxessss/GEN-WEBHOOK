@@ -84,15 +84,32 @@ async def play(interaction: discord.Interaction, cookie: str, game_id: str):
         session.cookies.set(".ROBLOSECURITY", cookie, domain=".roblox.com")
         session.headers.update({
             "User-Agent": "Roblox/WinInet",
-            "Referer": "https://www.roblox.com/"
+            "Referer": "https://www.roblox.com/",
+            "Origin": "https://www.roblox.com"
         })
 
-        # Get Auth Ticket
+        # Step 1: Trigger a CSRF Token by doing a fake POST
+        csrf_req = session.post("https://auth.roblox.com/v2/logout")
+        csrf_token = csrf_req.headers.get("x-csrf-token")
+
+        if not csrf_token:
+            await interaction.followup.send("❌ Could not get CSRF token.", ephemeral=True)
+            return
+
+        # Update session headers with CSRF token
+        session.headers.update({
+            "X-CSRF-TOKEN": csrf_token
+        })
+
+        # Step 2: Now get the authentication ticket
         auth_res = session.post(
             "https://auth.roblox.com/v1/authentication-ticket",
             headers={
                 "Accept": "application/json",
-                "RBX-Request-Identifier": "GetAuthenticationTicket"
+                "RBX-Request-Identifier": "GetAuthenticationTicket",
+                "X-CSRF-TOKEN": csrf_token,
+                "Origin": "https://www.roblox.com",
+                "Referer": "https://www.roblox.com/"
             }
         )
 
@@ -105,7 +122,7 @@ async def play(interaction: discord.Interaction, cookie: str, game_id: str):
             await interaction.followup.send("❌ Authentication ticket not found.", ephemeral=True)
             return
 
-        # Launch Roblox
+        # Step 3: Launch Roblox
         url = (
             f"roblox-player:1+launchmode:play+gameinfo:{auth_ticket}"
             f"+placelauncherurl:https://assetgame.roblox.com/game/PlaceLauncher.ashx"
