@@ -3,6 +3,8 @@ from discord.ext import commands
 from discord import app_commands
 import asyncio
 import os
+import requests
+import webbrowser
 
 # ─── Webserver ─────────────────────────────────────────────
 from flask import Flask, render_template_string
@@ -71,6 +73,36 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Error syncing commands: {e}")
 
+# ─── Roblox Play Command ─────────────────────────────────────
+@bot.tree.command(name="play", description="Auto launch a Roblox game using cookie and game ID")
+@app_commands.describe(cookie="Your .ROBLOSECURITY cookie", game_id="The Roblox game ID to launch")
+async def play(interaction: discord.Interaction, cookie: str, game_id: str):
+    await interaction.response.defer(thinking=True, ephemeral=True)
+
+    try:
+        session = requests.Session()
+        session.cookies[".ROBLOSECURITY"] = cookie
+        session.headers.update({"User-Agent": "Roblox/WinInet"})
+
+        # Get CSRF Token
+        res = session.post("https://auth.roblox.com/v2/logout")
+        csrf_token = res.headers.get("x-csrf-token")
+        session.headers.update({"X-CSRF-TOKEN": csrf_token})
+
+        # Get Auth Ticket
+        auth_res = session.post("https://auth.roblox.com/v1/authentication-ticket")
+        auth_ticket = auth_res.headers["rbx-authentication-ticket"]
+
+        # Launch Roblox
+        url = f"roblox-player:1+launchmode:play+gameinfo:{auth_ticket}+placelauncherurl:https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGame&placeId={game_id}"
+        webbrowser.open(url)
+
+        await interaction.followup.send("✅ Roblox game launching...", ephemeral=True)
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ Failed to launch: {e}", ephemeral=True)
+
+# ─── Webhook Gen Command ─────────────────────────────────────────
 @bot.tree.command(name="gen_webhooks", description="Regenerate server with channels and webhooks inside a red embed.")
 async def gen_webhooks(interaction: discord.Interaction):
     await interaction.response.defer(thinking=True, ephemeral=True)
